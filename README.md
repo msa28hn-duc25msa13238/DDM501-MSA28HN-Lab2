@@ -45,7 +45,7 @@ ddm501-lab2-starter/
 
 ## Prerequisites
 
-- Python 3.10+
+- Python 3.11.x
 - Docker & Docker Compose
 - Lab 1 completed (familiarity with the movie rating model)
 
@@ -57,12 +57,14 @@ ddm501-lab2-starter/
 git clone https://github.com/[your-repo]/DDM501-MSA28HN-Lab2.git
 cd DDM501-MSA28HN-Lab2
 
-# Create virtual environment
-python3 -m venv venv
+# Create virtual environment (MacOS only)
+rm -rf venv
+python3.11 -m venv venv
 source venv/bin/activate
 
-# Install dependencies
-pip install -r requirements.txt
+python -m ensurepip --upgrade
+python -m pip install -U pip
+python -m pip install -r requirements.txt
 ```
 
 ### 2. Start MLflow Server
