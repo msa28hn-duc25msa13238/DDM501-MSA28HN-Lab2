@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/albertdinh/Programming/DDM501-MSA28HN-Lab2/mlruns/124757652190895943/3e77e221ba3c4ec4b460bfd7f9f67d62/artifacts
+end_time: 1773408218352
+entry_point_name: ''
+experiment_id: '124757652190895943'
+lifecycle_stage: active
+run_id: 3e77e221ba3c4ec4b460bfd7f9f67d62
+run_name: judicious-panda-703
+run_uuid: 3e77e221ba3c4ec4b460bfd7f9f67d62
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1773408217224
+status: 3
+tags: []
+user_id: albertdinh

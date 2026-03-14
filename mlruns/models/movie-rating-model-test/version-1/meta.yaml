@@ -1,0 +1,14 @@
+aliases: []
+creation_timestamp: 1773409062433
+current_stage: Production
+description: null
+last_updated_timestamp: 1773409062435
+name: movie-rating-model-test
+run_id: ab9e01dd06f74184bde4858cdd4f2bbf
+run_link: null
+source: file:///Users/albertdinh/Programming/DDM501-MSA28HN-Lab2/mlruns/262033444782124157/ab9e01dd06f74184bde4858cdd4f2bbf/artifacts/model_svd_ab9e01dd06f74184bde4858cdd4f2bbf.pkl
+status: READY
+status_message: null
+storage_location: file:///Users/albertdinh/Programming/DDM501-MSA28HN-Lab2/mlruns/262033444782124157/ab9e01dd06f74184bde4858cdd4f2bbf/artifacts/model_svd_ab9e01dd06f74184bde4858cdd4f2bbf.pkl
+user_id: null
+version: 1
