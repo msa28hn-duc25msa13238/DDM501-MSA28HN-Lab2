@@ -9,6 +9,7 @@ mlflow==2.9.2
 
 # Airflow for orchestration
 apache-airflow==2.8.0
+Flask-Session==0.5.0
 
 # FastAPI (from Lab 1)
 fastapi==0.104.1
@@ -32,5 +33,4 @@ pytest==7.4.3
 pytest-cov==4.1.0
 
 # Database
-# Airflow 2.8.0 requires SQLAlchemy < 2.0.
 sqlalchemy==1.4.54
