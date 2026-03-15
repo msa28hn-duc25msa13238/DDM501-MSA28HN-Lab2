@@ -147,18 +147,9 @@ def train_with_config(trainset: Any, config: Dict[str, Any]) -> Tuple[Any, str]:
         config = {"model_type": "svd", "n_factors": 100, "n_epochs": 20}
         model, run_id = train_with_config(trainset, config)
     """
-    # TODO: Implement this function
-    #
-    # Hints:
-    # 1. Make a copy of config to avoid modifying the original
-    # 2. Pop 'model_type' from the config
-    # 3. Pass remaining items to train_model
-    #
-    # config_copy = config.copy()
-    # model_type = config_copy.pop("model_type")
-    # return train_model(trainset, model_type=model_type, **config_copy)
-    
-    pass  # Remove this and implement the function
+    config_copy = config.copy()
+    model_type = config_copy.pop("model_type")
+    return train_model(trainset, model_type=model_type, **config_copy)
 
 
 # =============================================================================
@@ -182,14 +173,12 @@ def get_model_class(model_type: str):
     Raises:
         ValueError: If model_type is not supported
     """
-    # TODO: Implement this function
-    #
-    # if model_type not in MODEL_CLASSES:
-    #     raise ValueError(f"Unknown model type: {model_type}. "
-    #                      f"Supported types: {list(MODEL_CLASSES.keys())}")
-    # return MODEL_CLASSES[model_type]
-    
-    pass  # Remove this and implement the function
+    if model_type not in MODEL_CLASSES:
+        raise ValueError(
+            f"Unknown model type: {model_type}. "
+            f"Supported types: {list(MODEL_CLASSES.keys())}"
+        )
+    return MODEL_CLASSES[model_type]
 
 
 # =============================================================================

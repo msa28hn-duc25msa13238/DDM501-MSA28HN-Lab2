@@ -159,48 +159,68 @@ def generate_experiment_report(
     Returns:
         Report content as string
     """
-    # TODO: Implement this function
-    #
-    # Example structure:
-    # report = []
-    # report.append("# Experiment Report")
-    # report.append(f"\nGenerated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-    #
-    # # Summary
-    # successful = [r for r in results if 'metrics' in r]
-    # report.append(f"## Summary\n")
-    # report.append(f"- Total experiments: {len(results)}")
-    # report.append(f"- Successful: {len(successful)}")
-    # report.append(f"- Failed: {len(results) - len(successful)}\n")
-    #
-    # # Results table
-    # report.append("## Results\n")
-    # report.append("| Model | Parameters | RMSE | MAE |")
-    # report.append("|-------|------------|------|-----|")
-    #
-    # for r in successful:
-    #     model_type = r['config'].get('model_type', 'unknown')
-    #     params = {k: v for k, v in r['config'].items() if k != 'model_type'}
-    #     rmse = r['metrics'].get('rmse', 'N/A')
-    #     mae = r['metrics'].get('mae', 'N/A')
-    #     report.append(f"| {model_type} | {params} | {rmse:.4f} | {mae:.4f} |")
-    #
-    # # Best model
-    # if successful:
-    #     best = min(successful, key=lambda x: x['metrics'].get('rmse', float('inf')))
-    #     report.append(f"\n## Best Model\n")
-    #     report.append(f"- Configuration: {best['config']}")
-    #     report.append(f"- RMSE: {best['metrics']['rmse']:.4f}")
-    #     report.append(f"- Run ID: {best['run_id']}")
-    #
-    # content = "\n".join(report)
-    #
-    # with open(output_path, 'w') as f:
-    #     f.write(content)
-    #
-    # return content
+    report = []
+    report.append("# Experiment Report")
+    report.append(f"\nGenerated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
 
-    pass  # Remove this and implement the function
+    successful = [r for r in results if "metrics" in r]
+    failed = [r for r in results if "error" in r]
+
+    report.append("## Summary\n")
+    report.append(f"- Total experiments: {len(results)}")
+    report.append(f"- Successful: {len(successful)}")
+    report.append(f"- Failed: {len(failed)}\n")
+
+    report.append("## Results\n")
+    report.append("| Model | Parameters | RMSE | MAE | Run ID |")
+    report.append("|-------|------------|------|-----|--------|")
+
+    for result in successful:
+        model_type = result["config"].get("model_type", "unknown")
+        params = {
+            key: value
+            for key, value in result["config"].items()
+            if key != "model_type"
+        }
+        report.append(
+            f"| {model_type} | {json.dumps(params, sort_keys=True)} | "
+            f"{result['metrics']['rmse']:.4f} | {result['metrics']['mae']:.4f} | "
+            f"{result['run_id']} |"
+        )
+
+    if failed:
+        report.append("\n## Failed Experiments\n")
+        for result in failed:
+            report.append(
+                f"- `{json.dumps(result['config'], sort_keys=True)}`: {result['error']}"
+            )
+
+    if successful:
+        best = min(successful, key=lambda x: x["metrics"].get("rmse", float("inf")))
+        report.append("\n## Best Model\n")
+        report.append(f"- Configuration: `{json.dumps(best['config'], sort_keys=True)}`")
+        report.append(f"- RMSE: {best['metrics']['rmse']:.4f}")
+        report.append(f"- MAE: {best['metrics']['mae']:.4f}")
+        report.append(f"- Run ID: `{best['run_id']}`")
+
+        report.append("\n## Recommendations\n")
+        report.append(
+            f"- Promote the `{best['config'].get('model_type', 'unknown')}` configuration "
+            f"with the lowest RMSE ({best['metrics']['rmse']:.4f}) for further validation."
+        )
+        report.append(
+            "- Review MLflow artifacts and prediction plots for the top runs before registration."
+        )
+    else:
+        report.append("\n## Recommendations\n")
+        report.append("- No successful experiments were available. Fix the failed runs and rerun the sweep.")
+
+    content = "\n".join(report) + "\n"
+
+    with open(output_path, "w") as f:
+        f.write(content)
+
+    return content
 
 
 # =============================================================================

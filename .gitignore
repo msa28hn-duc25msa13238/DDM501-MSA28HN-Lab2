@@ -162,6 +162,10 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# MLFlows
+mlruns/
+models/*.pkl
+
 # pytype static type analyzer
 .pytype/
 

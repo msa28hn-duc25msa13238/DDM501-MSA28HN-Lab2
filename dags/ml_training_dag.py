@@ -117,28 +117,19 @@ def preprocess_data_task(**context):
     - Load pickle files with pickle.load()
     - Push results with context['ti'].xcom_push()
     """
-    # TODO: Implement this function
-    #
-    # from pipeline.preprocessing import preprocess_data
-    # 
-    # # Get data path from previous task
-    # tmp_dir = context['ti'].xcom_pull(key='data_path')
-    # 
-    # # Load data
-    # with open(f'{tmp_dir}/trainset.pkl', 'rb') as f:
-    #     trainset = pickle.load(f)
-    # with open(f'{tmp_dir}/testset.pkl', 'rb') as f:
-    #     testset = pickle.load(f)
-    # 
-    # # Preprocess
-    # report = preprocess_data(trainset, testset)
-    # 
-    # # Push report
-    # context['ti'].xcom_push(key='preprocess_report', value=report)
-    # 
-    # return "Preprocessing complete"
-    
-    pass  # Remove this and implement
+    from pipeline.preprocessing import preprocess_data
+
+    tmp_dir = context['ti'].xcom_pull(task_ids='load_data', key='data_path')
+
+    with open(f'{tmp_dir}/trainset.pkl', 'rb') as f:
+        trainset = pickle.load(f)
+    with open(f'{tmp_dir}/testset.pkl', 'rb') as f:
+        testset = pickle.load(f)
+
+    report = preprocess_data(trainset, testset)
+    context['ti'].xcom_push(key='preprocess_report', value=report)
+
+    return "Preprocessing complete"
 
 
 # =============================================================================
@@ -159,39 +150,29 @@ def train_model_task(**context):
     - n_factors: 100
     - n_epochs: 20
     """
-    # TODO: Implement this function
-    #
-    # from pipeline.training import train_model, setup_mlflow
-    # 
-    # # Get data path
-    # tmp_dir = context['ti'].xcom_pull(key='data_path')
-    # 
-    # # Load trainset
-    # with open(f'{tmp_dir}/trainset.pkl', 'rb') as f:
-    #     trainset = pickle.load(f)
-    # 
-    # # Setup MLflow
-    # setup_mlflow()
-    # 
-    # # Train model
-    # model, run_id = train_model(
-    #     trainset,
-    #     model_type='svd',
-    #     run_name=f"airflow_run_{context['ds']}",
-    #     n_factors=100,
-    #     n_epochs=20
-    # )
-    # 
-    # # Save model for evaluation
-    # with open(f'{tmp_dir}/model.pkl', 'wb') as f:
-    #     pickle.dump(model, f)
-    # 
-    # # Push run_id
-    # context['ti'].xcom_push(key='run_id', value=run_id)
-    # 
-    # return f"Model trained. Run ID: {run_id}"
-    
-    pass  # Remove this and implement
+    from pipeline.training import train_model, setup_mlflow
+
+    tmp_dir = context['ti'].xcom_pull(task_ids='load_data', key='data_path')
+
+    with open(f'{tmp_dir}/trainset.pkl', 'rb') as f:
+        trainset = pickle.load(f)
+
+    setup_mlflow()
+
+    model, run_id = train_model(
+        trainset,
+        model_type='svd',
+        run_name=f"airflow_run_{context['ds']}",
+        n_factors=100,
+        n_epochs=20,
+    )
+
+    with open(f'{tmp_dir}/model.pkl', 'wb') as f:
+        pickle.dump(model, f)
+
+    context['ti'].xcom_push(key='run_id', value=run_id)
+
+    return f"Model trained. Run ID: {run_id}"
 
 
 # =============================================================================
@@ -207,29 +188,20 @@ def evaluate_model_task(**context):
     3. Evaluates using evaluate_model()
     4. Pushes metrics via XCom
     """
-    # TODO: Implement this function
-    #
-    # from pipeline.evaluation import evaluate_model
-    # 
-    # # Get data path and run_id
-    # tmp_dir = context['ti'].xcom_pull(key='data_path')
-    # run_id = context['ti'].xcom_pull(key='run_id')
-    # 
-    # # Load model and testset
-    # with open(f'{tmp_dir}/model.pkl', 'rb') as f:
-    #     model = pickle.load(f)
-    # with open(f'{tmp_dir}/testset.pkl', 'rb') as f:
-    #     testset = pickle.load(f)
-    # 
-    # # Evaluate
-    # metrics = evaluate_model(model, testset, run_id)
-    # 
-    # # Push metrics
-    # context['ti'].xcom_push(key='metrics', value=metrics)
-    # 
-    # return f"Evaluation complete. RMSE: {metrics['rmse']:.4f}"
-    
-    pass  # Remove this and implement
+    from pipeline.evaluation import evaluate_model
+
+    tmp_dir = context['ti'].xcom_pull(task_ids='load_data', key='data_path')
+    run_id = context['ti'].xcom_pull(task_ids='train_model', key='run_id')
+
+    with open(f'{tmp_dir}/model.pkl', 'rb') as f:
+        model = pickle.load(f)
+    with open(f'{tmp_dir}/testset.pkl', 'rb') as f:
+        testset = pickle.load(f)
+
+    metrics = evaluate_model(model, testset, run_id)
+    context['ti'].xcom_push(key='metrics', value=metrics)
+
+    return f"Evaluation complete. RMSE: {metrics['rmse']:.4f}"
 
 
 def decide_registration(**context):

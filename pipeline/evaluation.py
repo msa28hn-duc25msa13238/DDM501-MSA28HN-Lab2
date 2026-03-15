@@ -104,31 +104,36 @@ def calculate_additional_metrics(predictions: List) -> Dict[str, float]:
         - Each prediction has: prediction.r_ui (actual) and prediction.est (predicted)
         - Be careful with division by zero for MAPE
     """
-    # TODO: Implement this function
-    #
-    # Example structure:
-    # actuals = [pred.r_ui for pred in predictions]
-    # estimated = [pred.est for pred in predictions]
-    # 
-    # actuals = np.array(actuals)
-    # estimated = np.array(estimated)
-    # 
-    # mse = np.mean((actuals - estimated) ** 2)
-    # 
-    # # MAPE (handle division by zero)
-    # non_zero_mask = actuals != 0
-    # if np.any(non_zero_mask):
-    #     mape = np.mean(np.abs((actuals[non_zero_mask] - estimated[non_zero_mask]) / actuals[non_zero_mask])) * 100
-    # else:
-    #     mape = None
-    # 
-    # return {
-    #     "mse": mse,
-    #     "mape": mape,
-    #     "n_predictions": len(predictions),
-    # }
-    
-    pass  # Remove this and implement the function
+    actuals = np.array([pred.r_ui for pred in predictions], dtype=float)
+    estimated = np.array([pred.est for pred in predictions], dtype=float)
+    errors = estimated - actuals
+
+    mse = float(np.mean(errors ** 2))
+    mean_error = float(np.mean(errors))
+    error_std = float(np.std(errors))
+
+    non_zero_mask = actuals != 0
+    if np.any(non_zero_mask):
+        mape = float(
+            np.mean(
+                np.abs(
+                    (actuals[non_zero_mask] - estimated[non_zero_mask])
+                    / actuals[non_zero_mask]
+                )
+            )
+            * 100
+        )
+    else:
+        mape = None
+
+    return {
+        "mse": mse,
+        "mape": mape,
+        "coverage": 100.0 if predictions else 0.0,
+        "mean_error": mean_error,
+        "error_std": error_std,
+        "n_predictions": len(predictions),
+    }
 
 
 # =============================================================================
