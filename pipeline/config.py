@@ -61,6 +61,7 @@ MODEL_CONFIGS = {
 # =============================================================================
 # Experiment Configurations for Hyperparameter Tuning
 # =============================================================================
+# Balanced test plan: 3 variations each for SVD, NMF, and KNN.
 EXPERIMENT_CONFIGS = [
     # SVD experiments
     {
@@ -79,21 +80,17 @@ EXPERIMENT_CONFIGS = [
     },
     {
         "model_type": "svd",
-        "n_factors": 100,
-        "n_epochs": 50,
-        "lr_all": 0.005,
-        "reg_all": 0.02,
-    },
-    {
-        "model_type": "svd",
         "n_factors": 150,
         "n_epochs": 30,
         "lr_all": 0.01,
         "reg_all": 0.02,
     },
+
     # NMF experiments
+    {"model_type": "nmf", "n_factors": 30, "n_epochs": 30},
     {"model_type": "nmf", "n_factors": 50, "n_epochs": 50},
-    {"model_type": "nmf", "n_factors": 100, "n_epochs": 50},
+    {"model_type": "nmf", "n_factors": 100, "n_epochs": 70},
+
     # KNN experiments
     {
         "model_type": "knn",

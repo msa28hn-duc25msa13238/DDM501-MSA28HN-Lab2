@@ -1,8 +1,9 @@
 artifact_uri: file:///Users/albertdinh/Programming/DDM501-MSA28HN-Lab2/mlruns/262033444782124157/ab9e01dd06f74184bde4858cdd4f2bbf/artifacts
+deleted_time: 1773589973809
 end_time: 1773408692448
 entry_point_name: ''
 experiment_id: '262033444782124157'
-lifecycle_stage: active
+lifecycle_stage: deleted
 run_id: ab9e01dd06f74184bde4858cdd4f2bbf
 run_name: svd_n_factors=10_n_epochs=1
 run_uuid: ab9e01dd06f74184bde4858cdd4f2bbf

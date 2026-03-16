@@ -259,10 +259,16 @@ def main():
 
     # Compare top runs
     logger.info("\nTop 5 runs:")
-    top_runs = compare_runs(metric="rmse", top_n=5)
+    top_runs = compare_runs(
+        experiment_name="hyperparameter-tuning",
+        metric="rmse",
+        top_n=5,
+    )
     for i, run in enumerate(top_runs, 1):
+        rmse = run["metrics"].get("rmse")
+        rmse_display = f"{rmse:.4f}" if isinstance(rmse, (int, float)) else "N/A"
         logger.info(
-            f"  {i}. RMSE={run['metrics'].get('rmse', 'N/A'):.4f} - {run['params']}"
+            f"  {i}. RMSE={rmse_display} - {run['params']}"
         )
 
     logger.info(f"\nReport saved to: experiment_report.md")
