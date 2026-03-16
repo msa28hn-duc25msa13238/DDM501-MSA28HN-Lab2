@@ -120,9 +120,9 @@ Complete the following files:
 - [x] `pipeline/training.py` - Implement `train_model()` with MLflow logging
 - [x] `pipeline/evaluation.py` - Implement `evaluate_model()` with metrics
 - [x] `pipeline/registry.py` - Implement `register_best_model()`
-- [ ] `dags/ml_training_dag.py` - Create Airflow DAG
-- [ ] `experiments/run_experiments.py` - Run hyperparameter experiments
-- [ ] `docker-compose.yml` - Configure MLflow and Airflow services
+- [x] `dags/ml_training_dag.py` - Create Airflow DAG
+- [x] `experiments/run_experiments.py` - Run hyperparameter experiments
+- [x] `docker-compose.yml` - Configure MLflow and Airflow services
 
 ## MLflow Tracking
 
