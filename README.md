@@ -19,26 +19,26 @@ Build reproducible ML pipelines with MLflow experiment tracking and Airflow work
 
 ## Project Structure
 
-```
+```markdown
 ddm501-lab2-starter/
 ├── pipeline/
-│   ├── __init__.py
-│   ├── config.py           # Configuration parameters
-│   ├── data_ingestion.py   # Load and split data
-│   ├── preprocessing.py    # Data preprocessing
-│   ├── training.py         # Model training with MLflow (TODO)
-│   ├── evaluation.py       # Model evaluation (TODO)
-│   └── registry.py         # Model registration (TODO)
+│ ├── **init**.py
+│ ├── config.py # Configuration parameters
+│ ├── data_ingestion.py # Load and split data
+│ ├── preprocessing.py # Data preprocessing
+│ ├── training.py # Model training with MLflow (TODO)
+│ ├── evaluation.py # Model evaluation (TODO)
+│ └── registry.py # Model registration (TODO)
 ├── dags/
-│   └── ml_training_dag.py  # Airflow DAG (TODO)
+│ └── ml_training_dag.py # Airflow DAG (TODO)
 ├── experiments/
-│   └── run_experiments.py  # Hyperparameter tuning (TODO)
+│ └── run_experiments.py # Hyperparameter tuning (TODO)
 ├── tests/
-│   ├── __init__.py
-│   └── test_pipeline.py    # Pipeline tests
+│ ├── **init**.py
+│ └── test_pipeline.py # Pipeline tests
 ├── scripts/
-│   └── setup_mlflow.py     # MLflow setup script
-├── docker-compose.yml      # MLflow + Airflow services (TODO)
+│ └── setup_mlflow.py # MLflow setup script
+├── docker-compose.yml # MLflow + Airflow services (TODO)
 ├── requirements.txt
 └── README.md
 ```
@@ -80,7 +80,7 @@ mlflow server \
   --host 0.0.0.0 --port 5019
 ```
 
-Access MLflow UI at: http://localhost:5019
+Access MLflow UI at: <http://localhost:5019>
 
 ### 3. Run Pipeline
 
@@ -90,6 +90,12 @@ python -m pipeline.run_pipeline
 
 # Or run individual stages
 python -c "from pipeline.data_ingestion import load_data; load_data()"
+```
+
+### 3.1. Run All Experiments
+
+```bash
+python -m pipeline.run_experiments
 ```
 
 ### 4. Start Airflow (Optional)
@@ -111,6 +117,12 @@ Access Airflow UI at: http://localhost:8080
 
 ```bash
 docker-compose up -d
+```
+
+### 6. Run with docker-compose.yml
+
+```bash
+docker compose up -d --build
 ```
 
 ## TODO Tasks

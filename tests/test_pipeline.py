@@ -8,6 +8,29 @@ Run tests with:
 
 import pytest
 from unittest.mock import MagicMock, patch
+from types import SimpleNamespace
+
+
+class DummyPrediction:
+    """Minimal Surprise-style prediction object for tests."""
+
+    def __init__(self, est=4.0):
+        self.est = est
+
+
+class DummyModel:
+    """Pickle-friendly fake model used for MLflow logging tests."""
+
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+        self.fitted_on = None
+
+    def fit(self, trainset):
+        self.fitted_on = trainset
+        return self
+
+    def predict(self, user_id, item_id):
+        return DummyPrediction(est=4.0)
 
 
 class TestDataIngestion:
@@ -19,6 +42,16 @@ class TestDataIngestion:
         
         data = load_data('ml-100k')
         assert data is not None
+
+    def test_load_data_uses_non_interactive_builtin_download(self):
+        """Dataset loading should not prompt for input in Airflow/docker contexts."""
+        from pipeline.data_ingestion import load_data
+
+        with patch("pipeline.data_ingestion.Dataset.load_builtin", return_value="dataset") as mock_load:
+            data = load_data("ml-100k")
+
+        assert data == "dataset"
+        mock_load.assert_called_once_with("ml-100k", prompt=False)
     
     def test_split_data_returns_train_test(self):
         """Test that split_data returns trainset and testset."""
@@ -91,6 +124,48 @@ class TestTraining:
         params = get_default_params('svd')
         assert 'n_factors' in params
         assert 'n_epochs' in params
+
+    def test_train_model_logs_registry_model(self, tmp_path):
+        """Training should log both the pickle artifact and MLflow model artifact."""
+        from pipeline.training import train_model
+
+        active_run = SimpleNamespace(info=SimpleNamespace(run_id="run-123"))
+
+        with patch("pipeline.training.MODELS_DIR", tmp_path), patch.dict(
+            "pipeline.training.MODEL_CLASSES", {"svd": DummyModel}, clear=False
+        ), patch("pipeline.training.mlflow.start_run") as mock_start_run, patch(
+            "pipeline.training.mlflow.active_run", return_value=active_run
+        ), patch("pipeline.training.mlflow.log_param") as mock_log_param, patch(
+            "pipeline.training.mlflow.log_artifact"
+        ) as mock_log_artifact, patch(
+            "pipeline.training.mlflow.pyfunc.log_model"
+        ) as mock_log_model:
+            mock_start_run.return_value.__enter__.return_value = active_run
+            mock_start_run.return_value.__exit__.return_value = False
+
+            model, run_id = train_model(
+                trainset="trainset",
+                model_type="svd",
+                n_factors=10,
+                n_epochs=5,
+            )
+
+        assert isinstance(model, DummyModel)
+        assert model.fitted_on == "trainset"
+        assert run_id == "run-123"
+        mock_log_param.assert_any_call("model_type", "svd")
+        mock_log_param.assert_any_call("n_factors", 10)
+        mock_log_param.assert_any_call("n_epochs", 5)
+        mock_log_artifact.assert_called_once()
+
+        logged_model_path = tmp_path / "model_svd_run-123.pkl"
+        assert logged_model_path.exists()
+        mock_log_model.assert_called_once()
+        assert mock_log_model.call_args.kwargs["artifact_path"] == "model"
+        assert (
+            mock_log_model.call_args.kwargs["artifacts"]["model_pickle"]
+            == str(logged_model_path)
+        )
     
     # TODO: Add test for train_model after implementation
     # def test_train_model(self):
@@ -136,6 +211,101 @@ class TestRegistry:
         # This should not raise an error
         models = list_registered_models()
         assert isinstance(models, list)
+
+    def test_register_model_uses_mlflow_model_artifact(self):
+        """Registry should register the MLflow model directory, not the raw pickle."""
+        from pipeline.registry import register_model
+
+        client = MagicMock()
+        client.list_artifacts.return_value = [
+            SimpleNamespace(path="model"),
+            SimpleNamespace(path="model_svd_run-123.pkl"),
+        ]
+        result = SimpleNamespace(version="7")
+
+        with patch("pipeline.registry.MlflowClient", return_value=client), patch(
+            "pipeline.registry.mlflow.register_model", return_value=result
+        ) as mock_register:
+            version = register_model("run-123", "movie-rating-model")
+
+        assert version == "7"
+        mock_register.assert_called_once_with(
+            "runs:/run-123/model", "movie-rating-model"
+        )
+
+    def test_register_best_model_returns_registration_summary(self):
+        """Combined registry helper should return the selected run and version."""
+        from pipeline.registry import register_best_model
+
+        best_run = {
+            "run_id": "run-123",
+            "metrics": {"rmse": 0.91, "mae": 0.72},
+            "params": {"model_type": "svd"},
+            "artifact_uri": "mlruns:/artifact-uri",
+        }
+
+        with patch("pipeline.registry.find_best_run", return_value=best_run), patch(
+            "pipeline.registry.register_model", return_value="3"
+        ) as mock_register_model, patch(
+            "pipeline.registry.transition_model_stage"
+        ) as mock_transition:
+            result = register_best_model(
+                experiment_name="movie-rating-prediction",
+                model_name="movie-rating-model",
+                metric="rmse",
+                stage="Production",
+            )
+
+        mock_register_model.assert_called_once_with("run-123", "movie-rating-model")
+        mock_transition.assert_called_once_with(
+            "movie-rating-model", "3", "Production"
+        )
+        assert result == {
+            "run_id": "run-123",
+            "model_name": "movie-rating-model",
+            "version": "3",
+            "stage": "Production",
+            "metrics": {"rmse": 0.91, "mae": 0.72},
+        }
+
+    def test_find_best_run_skips_runs_without_model_artifact(self):
+        """Best-run lookup should ignore legacy runs that cannot be registered."""
+        from pipeline.registry import find_best_run
+
+        client = MagicMock()
+        client.get_experiment_by_name.return_value = SimpleNamespace(
+            experiment_id="exp-1"
+        )
+        client.search_runs.return_value = [
+            SimpleNamespace(
+                info=SimpleNamespace(
+                    run_id="legacy-best", artifact_uri="mlruns:/legacy-best"
+                ),
+                data=SimpleNamespace(metrics={"rmse": 0.90}, params={"model_type": "svd"}),
+            ),
+            SimpleNamespace(
+                info=SimpleNamespace(
+                    run_id="registerable-best",
+                    artifact_uri="mlruns:/registerable-best",
+                ),
+                data=SimpleNamespace(metrics={"rmse": 0.94}, params={"model_type": "svd"}),
+            ),
+        ]
+        client.list_artifacts.side_effect = [
+            [SimpleNamespace(path="model_svd_legacy-best.pkl")],
+            [SimpleNamespace(path="model"), SimpleNamespace(path="model_svd_registerable-best.pkl")],
+        ]
+
+        with patch("pipeline.registry.MlflowClient", return_value=client):
+            best_run = find_best_run(
+                experiment_name="movie-rating-prediction",
+                metric="rmse",
+                ascending=True,
+                required_artifact_path="model",
+            )
+
+        assert best_run["run_id"] == "registerable-best"
+        assert best_run["metrics"]["rmse"] == 0.94
 
 
 class TestConfig:

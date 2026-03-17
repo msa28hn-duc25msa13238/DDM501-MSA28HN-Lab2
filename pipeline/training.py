@@ -15,6 +15,8 @@ from pathlib import Path
 from typing import Any, Dict, Tuple, Optional
 
 import mlflow
+import pandas as pd
+from mlflow.models import infer_signature
 from surprise import SVD, NMF, KNNBasic
 
 from pipeline.config import (
@@ -36,6 +38,50 @@ MODEL_CLASSES = {
     "nmf": NMF,
     "knn": KNNBasic,
 }
+
+
+class SurprisePyfuncModel(mlflow.pyfunc.PythonModel):
+    """Minimal MLflow wrapper for Surprise recommenders."""
+
+    def load_context(self, context) -> None:
+        with open(context.artifacts["model_pickle"], "rb") as model_file:
+            self.model = pickle.load(model_file)
+
+    def predict(self, context, model_input: pd.DataFrame) -> pd.Series:
+        required_columns = {"user_id", "item_id"}
+        missing = required_columns.difference(model_input.columns)
+        if missing:
+            raise ValueError(
+                "model_input must contain columns: user_id, item_id. "
+                f"Missing: {sorted(missing)}"
+            )
+
+        predictions = [
+            self.model.predict(str(row.user_id), str(row.item_id)).est
+            for row in model_input.itertuples(index=False)
+        ]
+        return pd.Series(predictions, name="prediction")
+
+
+def log_registry_model(model_path: Path) -> None:
+    """Log a registry-compatible MLflow pyfunc model artifact."""
+    input_example = pd.DataFrame(
+        [{"user_id": "196", "item_id": "242"}]
+    )
+    output_example = pd.Series([0.0], name="prediction")
+
+    mlflow.pyfunc.log_model(
+        artifact_path="model",
+        python_model=SurprisePyfuncModel(),
+        artifacts={"model_pickle": str(model_path)},
+        input_example=input_example,
+        signature=infer_signature(input_example, output_example),
+        pip_requirements=[
+            "mlflow==2.9.2",
+            "pandas==2.1.3",
+            "scikit-surprise==1.1.3",
+        ],
+    )
 
 
 def setup_mlflow(
@@ -119,6 +165,7 @@ def train_model(
             pickle.dump(model, f)
 
         mlflow.log_artifact(str(model_path))
+        log_registry_model(model_path)
         logger.info(f"Training complete. Run ID: {run_id}")
 
         return model, run_id

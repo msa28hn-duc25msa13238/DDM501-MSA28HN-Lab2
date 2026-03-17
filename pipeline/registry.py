@@ -28,7 +28,8 @@ logger = logging.getLogger(__name__)
 def find_best_run(
     experiment_name: str = MLFLOW_EXPERIMENT_NAME,
     metric: str = "rmse",
-    ascending: bool = True
+    ascending: bool = True,
+    required_artifact_path: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Find the best run from an experiment based on a metric.
@@ -44,6 +45,7 @@ def find_best_run(
         experiment_name: Name of the MLflow experiment
         metric: Metric to optimize (default: 'rmse')
         ascending: If True, lower is better (default: True for RMSE)
+        required_artifact_path: Optional artifact path that must exist on the run
         
     Returns:
         Dictionary with best run information:
@@ -68,13 +70,31 @@ def find_best_run(
     runs = client.search_runs(
         experiment_ids=[experiment.experiment_id],
         order_by=[f"metrics.{metric} {order}"],
-        max_results=1,
+        max_results=100,
     )
 
     if not runs:
         raise ValueError(f"No runs found in experiment '{experiment_name}'")
 
-    best_run = runs[0]
+    best_run = None
+    for run in runs:
+        if required_artifact_path is None:
+            best_run = run
+            break
+
+        artifact_names = {
+            artifact.path for artifact in client.list_artifacts(run.info.run_id)
+        }
+        if required_artifact_path in artifact_names:
+            best_run = run
+            break
+
+    if best_run is None:
+        raise ValueError(
+            f"No runs found in experiment '{experiment_name}' containing artifact "
+            f"'{required_artifact_path}'"
+        )
+
     return {
         "run_id": best_run.info.run_id,
         "metrics": best_run.data.metrics,
@@ -113,19 +133,16 @@ def register_model(
         print(f"Registered model version: {version}")
     """
     client = MlflowClient()
-    artifact_to_register = artifact_path
+    root_artifacts = client.list_artifacts(run_id)
+    artifact_names = {artifact.path for artifact in root_artifacts}
 
-    if artifact_path == "model":
-        artifacts = client.list_artifacts(run_id)
-        artifact_names = {artifact.path for artifact in artifacts}
-        if artifact_path not in artifact_names:
-            model_artifacts = [
-                artifact.path for artifact in artifacts if artifact.path.endswith(".pkl")
-            ]
-            if model_artifacts:
-                artifact_to_register = model_artifacts[0]
+    if artifact_path not in artifact_names:
+        raise ValueError(
+            f"Run '{run_id}' does not contain an MLflow model artifact at "
+            f"'{artifact_path}'. Available root artifacts: {sorted(artifact_names)}"
+        )
 
-    model_uri = f"runs:/{run_id}/{artifact_to_register}"
+    model_uri = f"runs:/{run_id}/{artifact_path}"
     logger.info(f"Registering model from {model_uri} as '{model_name}'")
 
     result = mlflow.register_model(model_uri, model_name)
@@ -172,6 +189,7 @@ def transition_model_stage(
         name=model_name,
         version=version,
         stage=stage,
+        archive_existing_versions=(stage == "Production"),
     )
     logger.info(f"Model {model_name} v{version} is now in {stage}")
 
@@ -215,7 +233,12 @@ def register_best_model(
         result = register_best_model()
         print(f"Registered {result['model_name']} v{result['version']}")
     """
-    best_run = find_best_run(experiment_name, metric, ascending=True)
+    best_run = find_best_run(
+        experiment_name,
+        metric,
+        ascending=True,
+        required_artifact_path="model",
+    )
     logger.info(
         f"Best run: {best_run['run_id']} with {metric}={best_run['metrics'].get(metric)}"
     )

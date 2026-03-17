@@ -12,7 +12,7 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
     AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session
-    MLFLOW_TRACKING_URI: http://mlflow:5019
+    MLFLOW_TRACKING_URI: http://mlflow:5000
     PYTHONPATH: /opt/airflow
   volumes: &airflow-common-volumes
     - ./dags:/opt/airflow/dags
@@ -22,6 +22,8 @@ x-airflow-common: &airflow-common
     - ./artifacts:/opt/airflow/artifacts
     - ./logs:/opt/airflow/logs
   depends_on: &airflow-common-depends-on
+    mlflow:
+      condition: service_healthy
     postgres:
       condition: service_healthy
     airflow-init:
@@ -31,25 +33,26 @@ services:
   mlflow:
     image: ghcr.io/mlflow/mlflow:v2.9.2
     container_name: mlflow-server
+    entrypoint: ["mlflow"]
     ports:
-      - "5019:5019"
+      - "5019:5000"
     volumes:
       - ./mlruns:/mlflow/mlruns
       - mlflow_db:/mlflow/db
     environment:
       MLFLOW_TRACKING_URI: http://localhost:5019
       MLFLOW_BACKEND_STORE_URI: sqlite:////mlflow/db/mlflow.db
-      MLFLOW_ARTIFACT_ROOT: /mlflow/mlruns
-    command: >
-      sh -c "
-        mlflow server
-        --backend-store-uri $$MLFLOW_BACKEND_STORE_URI
-        --default-artifact-root $$MLFLOW_ARTIFACT_ROOT
-        --host 0.0.0.0
-        --port 5019
-      "
+      MLFLOW_ARTIFACT_ROOT: mlflow-artifacts:/
+    command:
+      - server
+      - --backend-store-uri=sqlite:////mlflow/db/mlflow.db
+      - --serve-artifacts
+      - --artifacts-destination=/mlflow/mlruns
+      - --default-artifact-root=mlflow-artifacts:/
+      - --host=0.0.0.0
+      - --port=5000
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5019')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000')"]
       interval: 20s
       timeout: 10s
       retries: 5
@@ -111,7 +114,7 @@ services:
     volumes:
       - .:/app
     environment:
-      MLFLOW_TRACKING_URI: http://mlflow:5019
+      MLFLOW_TRACKING_URI: http://mlflow:5000
     depends_on:
       mlflow:
         condition: service_healthy
