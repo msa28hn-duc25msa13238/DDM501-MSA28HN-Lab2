@@ -111,7 +111,7 @@ airflow webserver --port 8080
 airflow scheduler
 ```
 
-Access Airflow UI at: http://localhost:8080
+Access Airflow UI at: <http://localhost:8080>
 
 ### 5. Run with Docker
 
@@ -124,6 +124,9 @@ docker-compose up -d
 ```bash
 docker compose up -d --build
 ```
+
+Access MLflow UI at: <http://localhost:5019>
+Access Airflow UI at: <http://localhost:8081>
 
 ## TODO Tasks
 
