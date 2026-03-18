@@ -12,10 +12,14 @@ Usage:
 
 import json
 import logging
+import shutil
 from datetime import datetime
-from typing import Any, Dict, List
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 import mlflow
+import matplotlib.pyplot as plt
+from mlflow.tracking import MlflowClient
 
 from pipeline.config import EXPERIMENT_CONFIGS, MLFLOW_EXPERIMENT_NAME
 from pipeline.data_ingestion import load_and_split
@@ -28,6 +32,8 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+CHART_OUTPUT_DIR = Path("artifacts/experiment_charts")
 
 
 # =============================================================================
@@ -165,6 +171,7 @@ def generate_experiment_report(
 
     successful = [r for r in results if "metrics" in r]
     failed = [r for r in results if "error" in r]
+    visualizations = generate_experiment_visualizations(successful)
 
     report.append("## Summary\n")
     report.append(f"- Total experiments: {len(results)}")
@@ -203,13 +210,38 @@ def generate_experiment_report(
         report.append(f"- MAE: {best['metrics']['mae']:.4f}")
         report.append(f"- Run ID: `{best['run_id']}`")
 
+        if visualizations:
+            report.append("\n## Visualizations\n")
+            if visualizations.get("rmse_bar_chart"):
+                report.append("### RMSE Across All Runs\n")
+                report.append(
+                    f"![RMSE across all runs]({visualizations['rmse_bar_chart']})"
+                )
+            if visualizations.get("rmse_mae_scatter"):
+                report.append("\n### RMSE vs MAE Comparison\n")
+                report.append(
+                    f"![RMSE vs MAE comparison]({visualizations['rmse_mae_scatter']})"
+                )
+            if visualizations.get("best_model_diagnostic"):
+                report.append("\n### Best Model Diagnostic Plot\n")
+                report.append(
+                    f"![Best model prediction distribution]({visualizations['best_model_diagnostic']})"
+                )
+
         report.append("\n## Recommendations\n")
         report.append(
-            f"- Promote the `{best['config'].get('model_type', 'unknown')}` configuration "
-            f"with the lowest RMSE ({best['metrics']['rmse']:.4f}) for further validation."
+            f"- Select `{best['config'].get('model_type', 'unknown')}` with run ID "
+            f"`{best['run_id']}` for production because it achieved the best RMSE "
+            f"({best['metrics']['rmse']:.4f}) while maintaining strong MAE "
+            f"({best['metrics']['mae']:.4f})."
         )
         report.append(
-            "- Review MLflow artifacts and prediction plots for the top runs before registration."
+            "- Use the comparison charts above to justify why the selected configuration "
+            "outperformed the other experiment runs."
+        )
+        report.append(
+            "- Keep the prediction distribution plot in the report as the diagnostic "
+            "visualization for the chosen production model."
         )
     else:
         report.append("\n## Recommendations\n")
@@ -221,6 +253,114 @@ def generate_experiment_report(
         f.write(content)
 
     return content
+
+
+def generate_experiment_visualizations(
+    successful_results: List[Dict[str, Any]],
+    output_dir: Path = CHART_OUTPUT_DIR,
+) -> Dict[str, str]:
+    """Create report-ready experiment comparison charts and diagnostic plots."""
+    if not successful_results:
+        return {}
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    color_map = {
+        "svd": "#1f77b4",
+        "nmf": "#ff7f0e",
+        "knn": "#2ca02c",
+    }
+
+    labels = [
+        f"{result['config'].get('model_type', 'model')}-{index}"
+        for index, result in enumerate(successful_results, start=1)
+    ]
+    rmse_values = [result["metrics"]["rmse"] for result in successful_results]
+    mae_values = [result["metrics"]["mae"] for result in successful_results]
+    colors = [
+        color_map.get(result["config"].get("model_type", "unknown"), "#7f7f7f")
+        for result in successful_results
+    ]
+
+    rmse_chart_path = output_dir / "rmse_across_runs.png"
+    plt.figure(figsize=(12, 6))
+    bars = plt.bar(labels, rmse_values, color=colors)
+    plt.ylabel("RMSE")
+    plt.xlabel("Experiment Run")
+    plt.title("RMSE Across All Experiment Runs")
+    plt.xticks(rotation=35, ha="right")
+    for bar, value in zip(bars, rmse_values):
+        plt.text(
+            bar.get_x() + bar.get_width() / 2,
+            value + 0.003,
+            f"{value:.3f}",
+            ha="center",
+            va="bottom",
+            fontsize=8,
+        )
+    plt.tight_layout()
+    plt.savefig(rmse_chart_path, dpi=200, bbox_inches="tight")
+    plt.close()
+
+    scatter_chart_path = output_dir / "rmse_vs_mae_scatter.png"
+    plt.figure(figsize=(10, 6))
+    for label, rmse, mae, color, result in zip(
+        labels, rmse_values, mae_values, colors, successful_results
+    ):
+        plt.scatter(rmse, mae, s=90, color=color)
+        plt.annotate(label, (rmse, mae), textcoords="offset points", xytext=(6, 6))
+    plt.xlabel("RMSE")
+    plt.ylabel("MAE")
+    plt.title("RMSE vs MAE Across Experiment Runs")
+    plt.grid(alpha=0.25)
+    plt.tight_layout()
+    plt.savefig(scatter_chart_path, dpi=200, bbox_inches="tight")
+    plt.close()
+
+    best_result = min(
+        successful_results,
+        key=lambda result: result["metrics"].get("rmse", float("inf")),
+    )
+    diagnostic_chart_path = download_best_model_diagnostic(
+        best_result["run_id"],
+        output_dir,
+    )
+
+    visualizations = {
+        "rmse_bar_chart": str(rmse_chart_path),
+        "rmse_mae_scatter": str(scatter_chart_path),
+    }
+    if diagnostic_chart_path is not None:
+        visualizations["best_model_diagnostic"] = str(diagnostic_chart_path)
+    return visualizations
+
+
+def download_best_model_diagnostic(
+    run_id: str, output_dir: Path
+) -> Optional[Path]:
+    """Download the best run's prediction distribution plot from MLflow."""
+    client = MlflowClient()
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        downloaded_path = Path(
+            client.download_artifacts(
+                run_id,
+                "prediction_distribution.png",
+                str(output_dir),
+            )
+        )
+    except Exception as exc:
+        logger.warning(
+            "Could not download prediction_distribution.png for run %s: %s",
+            run_id,
+            exc,
+        )
+        return None
+
+    target_path = output_dir / "best_model_prediction_distribution.png"
+    if downloaded_path != target_path:
+        shutil.copy2(downloaded_path, target_path)
+    return target_path
 
 
 # =============================================================================

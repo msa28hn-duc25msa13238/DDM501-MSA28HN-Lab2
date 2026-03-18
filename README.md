@@ -172,6 +172,34 @@ Your experiment report should include:
 4. **Visualizations**: Charts comparing experiments
 5. **Recommendations**: Selected model for production
 
+## Project Gallery
+
+The figures below summarize the completed experiment tracking and workflow orchestration setup.
+
+### MLflow Experiments
+
+Experiment comparison view in MLflow showing tracked runs and model outputs.
+
+![MLflow experiments](media/experiments.png)
+
+Detailed MLflow run view with logged metrics, parameters, and artifacts.
+
+![Detailed MLflow run](media/detailed_run_1.png)
+
+### Airflow Orchestration
+
+Complete Airflow result
+
+![Airflow DAG run](media/airflow_run.png)
+
+Successful end-to-end DAG execution in Airflow.
+
+![Airflow DAG all success](media/dag_all_success.png)
+
+Airflow registering best model.
+
+![Airflow best model branch](media/airflow_run_best_model.png)
+
 ## Running Tests
 
 ```bash

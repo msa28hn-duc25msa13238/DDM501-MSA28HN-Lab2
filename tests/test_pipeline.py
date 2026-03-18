@@ -308,6 +308,79 @@ class TestRegistry:
         assert best_run["metrics"]["rmse"] == 0.94
 
 
+class TestExperiments:
+    """Tests for experiment sweep reporting helpers."""
+
+    def test_generate_experiment_visualizations_creates_report_assets(self, tmp_path):
+        """Experiment charts should be generated for RMSE/MAE and best-model diagnostics."""
+        from experiments.run_experiments import generate_experiment_visualizations
+
+        results = [
+            {
+                "config": {"model_type": "svd", "n_factors": 50},
+                "run_id": "run-1",
+                "metrics": {"rmse": 0.94, "mae": 0.74},
+            },
+            {
+                "config": {"model_type": "nmf", "n_factors": 30},
+                "run_id": "run-2",
+                "metrics": {"rmse": 0.91, "mae": 0.72},
+            },
+        ]
+
+        diagnostic_source = tmp_path / "prediction_distribution.png"
+        diagnostic_source.write_bytes(b"fake-image")
+
+        with patch(
+            "experiments.run_experiments.download_best_model_diagnostic",
+            return_value=diagnostic_source,
+        ) as mock_download:
+            visualizations = generate_experiment_visualizations(
+                results, output_dir=tmp_path / "charts"
+            )
+
+        assert (tmp_path / "charts" / "rmse_across_runs.png").exists()
+        assert (tmp_path / "charts" / "rmse_vs_mae_scatter.png").exists()
+        assert visualizations["rmse_bar_chart"].endswith("rmse_across_runs.png")
+        assert visualizations["rmse_mae_scatter"].endswith("rmse_vs_mae_scatter.png")
+        assert visualizations["best_model_diagnostic"].endswith(
+            "prediction_distribution.png"
+        )
+        mock_download.assert_called_once_with("run-2", tmp_path / "charts")
+
+    def test_generate_experiment_report_includes_visualization_section(self, tmp_path):
+        """Markdown report should include chart and production recommendation sections."""
+        from experiments.run_experiments import generate_experiment_report
+
+        results = [
+            {
+                "config": {"model_type": "svd", "n_factors": 50},
+                "run_id": "run-1",
+                "metrics": {"rmse": 0.93, "mae": 0.73},
+            }
+        ]
+        report_path = tmp_path / "experiment_report.md"
+
+        with patch(
+            "experiments.run_experiments.generate_experiment_visualizations",
+            return_value={
+                "rmse_bar_chart": "artifacts/experiment_charts/rmse_across_runs.png",
+                "rmse_mae_scatter": "artifacts/experiment_charts/rmse_vs_mae_scatter.png",
+                "best_model_diagnostic": (
+                    "artifacts/experiment_charts/"
+                    "best_model_prediction_distribution.png"
+                ),
+            },
+        ):
+            report = generate_experiment_report(results, output_path=str(report_path))
+
+        assert "## Visualizations" in report
+        assert "## Recommendations" in report
+        assert "for production" in report
+        assert "RMSE Across All Runs" in report
+        assert report_path.exists()
+
+
 class TestConfig:
     """Tests for configuration."""
     
